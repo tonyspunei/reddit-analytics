@@ -7,13 +7,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RedditPost } from "@/lib/utils";
+import { AnalyzedPost, PostCategory } from "@/lib/postAnalyzer";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface PostsTableProps {
-  posts: RedditPost[];
+  posts: (RedditPost | AnalyzedPost)[];
 }
 
 type SortField = 'title' | 'score' | 'numComments' | 'createdAt';
@@ -25,6 +27,19 @@ interface SortState {
 }
 
 const ITEMS_PER_PAGE = 15;
+
+// Helper function to check if a post is analyzed
+function isAnalyzedPost(post: RedditPost | AnalyzedPost): post is AnalyzedPost {
+  return 'categories' in post;
+}
+
+// Helper function to get category display info
+const CATEGORY_DISPLAY = {
+  solutionRequests: { label: 'Solution', className: 'bg-blue-500' },
+  painAndAnger: { label: 'Pain & Anger', className: 'bg-red-500' },
+  adviceRequests: { label: 'Advice', className: 'bg-green-500' },
+  moneyTalk: { label: 'Money', className: 'bg-yellow-500' },
+} as const;
 
 export function PostsTable({ posts }: PostsTableProps) {
   const [sort, setSort] = useState<SortState>({
@@ -68,7 +83,7 @@ export function PostsTable({ posts }: PostsTableProps) {
               : 'asc'
           : 'asc'
     }));
-    setCurrentPage(1); // Reset to first page when sorting changes
+    setCurrentPage(1);
   };
 
   const getSortIcon = (field: SortField) => {
@@ -77,6 +92,9 @@ export function PostsTable({ posts }: PostsTableProps) {
     if (sort.direction === 'desc') return <ArrowDown className="w-4 h-4 ml-2" />;
     return <ArrowUpDown className="w-4 h-4 ml-2" />;
   };
+
+  // Check if we're dealing with analyzed posts
+  const hasCategories = posts.length > 0 && isAnalyzedPost(posts[0]);
 
   // Pagination logic
   const sortedPosts = getSortedPosts();
@@ -133,6 +151,9 @@ export function PostsTable({ posts }: PostsTableProps) {
                 {getSortIcon('createdAt')}
               </Button>
             </TableHead>
+            {hasCategories && (
+              <TableHead className="w-[200px] text-right">Categories</TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -153,6 +174,23 @@ export function PostsTable({ posts }: PostsTableProps) {
               <TableCell className="text-right">
                 {formatDistanceToNow(post.createdAt, { addSuffix: true })}
               </TableCell>
+              {hasCategories && (
+                <TableCell className="text-right">
+                  <div className="flex gap-1 justify-end flex-wrap">
+                    {isAnalyzedPost(post) && Object.entries(post.categories)
+                      .filter(([_, value]) => value)
+                      .map(([category]) => (
+                        <Badge 
+                          key={category}
+                          variant="secondary"
+                          className={CATEGORY_DISPLAY[category as keyof PostCategory].className}
+                        >
+                          {CATEGORY_DISPLAY[category as keyof PostCategory].label}
+                        </Badge>
+                      ))}
+                  </div>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

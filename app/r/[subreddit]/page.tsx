@@ -16,23 +16,23 @@ interface SubredditPageProps {
 }
 
 export default function SubredditPage({ params }: SubredditPageProps) {
-  const [posts, setPosts] = useState<RedditPost[]>([]);
   const [analyzedPosts, setAnalyzedPosts] = useState<AnalyzedPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("posts");
 
-  // Fetch regular posts
+  // Fetch analyzed posts for both tabs
   useEffect(() => {
     async function fetchPosts() {
       try {
         setIsLoading(true);
         setError(null);
-        const response = await fetch(`/api/reddit?subreddit=${params.subreddit}`);
+        const response = await fetch(
+          `/api/reddit?subreddit=${params.subreddit}&analyze=true`
+        );
         if (!response.ok) throw new Error('Failed to fetch posts');
         const data = await response.json();
-        setPosts(data);
+        setAnalyzedPosts(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch posts');
       } finally {
@@ -42,30 +42,6 @@ export default function SubredditPage({ params }: SubredditPageProps) {
 
     fetchPosts();
   }, [params.subreddit]);
-
-  // Fetch analyzed posts when switching to themes tab
-  useEffect(() => {
-    async function fetchAnalyzedPosts() {
-      if (activeTab !== "themes" || analyzedPosts.length > 0) return;
-
-      try {
-        setIsAnalyzing(true);
-        setError(null);
-        const response = await fetch(
-          `/api/reddit?subreddit=${params.subreddit}&analyze=true`
-        );
-        if (!response.ok) throw new Error('Failed to analyze posts');
-        const data = await response.json();
-        setAnalyzedPosts(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to analyze posts');
-      } finally {
-        setIsAnalyzing(false);
-      }
-    }
-
-    fetchAnalyzedPosts();
-  }, [activeTab, params.subreddit, analyzedPosts.length]);
 
   return (
     <main className="container mx-auto py-8">
@@ -96,14 +72,14 @@ export default function SubredditPage({ params }: SubredditPageProps) {
               {error}
             </div>
           ) : (
-            <PostsTable posts={posts} />
+            <PostsTable posts={analyzedPosts} />
           )}
         </TabsContent>
 
         <TabsContent value="themes" className="space-y-4">
-          {isAnalyzing ? (
+          {isLoading ? (
             <div className="rounded-lg border p-8 text-center text-muted-foreground">
-              Analyzing posts... This may take a moment.
+              Loading posts...
             </div>
           ) : error ? (
             <div className="rounded-lg border p-8 text-center text-red-500">
