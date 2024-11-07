@@ -19,7 +19,7 @@ export interface RedditPost {
 
 export class RedditFetcher {
   private reddit: snoowrap;
-  private static readonly POST_FETCH_LIMIT = 100;
+  private static readonly POST_FETCH_LIMIT = 500;
 
   constructor() {
     // Validate environment variables with more detailed error messages
