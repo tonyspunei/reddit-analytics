@@ -1,8 +1,19 @@
 "use client";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { RedditPost } from '@/lib/utils';
+import { useState, useEffect } from 'react';
+import { PostsTable } from '@/components/PostsTable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+async function fetchSubredditPosts(subreddit: string) {
+  const response = await fetch(`/api/reddit?subreddit=${subreddit}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch posts');
+  }
+  return response.json();
+}
 
 interface SubredditPageProps {
   params: {
@@ -11,6 +22,27 @@ interface SubredditPageProps {
 }
 
 export default function SubredditPage({ params }: SubredditPageProps) {
+  const [posts, setPosts] = useState<RedditPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadPosts = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await fetchSubredditPosts(params.subreddit);
+        setPosts(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch posts');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPosts();
+  }, [params.subreddit]);
+
   return (
     <main className="container mx-auto py-8">
       <div className="mb-8">
@@ -31,9 +63,17 @@ export default function SubredditPage({ params }: SubredditPageProps) {
         </TabsList>
 
         <TabsContent value="posts" className="space-y-4">
-          <div className="rounded-lg border p-8 text-center text-muted-foreground">
-            Top Posts content coming soon...
-          </div>
+          {isLoading ? (
+            <div className="rounded-lg border p-8 text-center text-muted-foreground">
+              Loading posts...
+            </div>
+          ) : error ? (
+            <div className="rounded-lg border p-8 text-center text-red-500">
+              {error}
+            </div>
+          ) : (
+            <PostsTable posts={posts} />
+          )}
         </TabsContent>
 
         <TabsContent value="themes" className="space-y-4">
