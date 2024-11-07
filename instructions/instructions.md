@@ -104,7 +104,7 @@ reddit-analytics
 ├── app
 │   ├── layout.tsx
 │   ├── page.tsx
-│   └── subreddit
+│   └── r
 │       └── [subreddit]
 │           └── page.tsx
 ├── lib
@@ -127,7 +127,7 @@ reddit-analytics
 - Home page displaying subreddit cards
 - Contains the "Add Reddit" modal component
 
-#### app/subreddit/[subreddit]/page.tsx
+#### app/r/[subreddit]/page.tsx
 - Dynamic route for subreddit pages
 - Implements "Top Posts" and "Themes" tabs
 - Contains components for displaying posts and themes
