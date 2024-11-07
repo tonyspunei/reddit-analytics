@@ -23,7 +23,18 @@ export class PostAnalyzer {
         "Missing OPENAI_API_KEY environment variable. Please add it to your .env file."
       );
     }
-    this.openai = new OpenAI({ apiKey });
+    if (!process.env.HELICONE_API_KEY) {
+      throw new Error(
+        "Missing HELICONE_API_KEY environment variable. Please add it to your .env file."
+      );
+    }
+    this.openai = new OpenAI({
+      apiKey,
+      baseURL: "https://oai.helicone.ai/v1",
+      defaultHeaders: {
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      },
+    });
   }
 
   private async analyzePost(post: RedditPost): Promise<PostCategory> {
@@ -35,10 +46,13 @@ export class PostAnalyzer {
           {
             role: "system",
             content: `Analyze the Reddit post and categorize it into the following categories. Return a JSON object with boolean values:
+
+            # CATEGORIES CRITERIA: """
             - solutionRequests: Posts seeking solutions for problems
             - painAndAnger: Posts expressing pains or anger
             - adviceRequests: Posts seeking advice
-            - moneyTalk: Posts discussing spending money`
+            - moneyTalk: Posts discussing spending money
+            """`
           },
           {
             role: "user",
