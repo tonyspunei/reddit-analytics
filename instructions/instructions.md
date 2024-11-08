@@ -413,7 +413,7 @@ export class PostAnalyzer {
   async analyzePost(post: RedditPost): Promise<PostCategoryAnalysis> {
     try {
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         temperature: 0,
         messages: [
           {
