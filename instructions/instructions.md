@@ -23,11 +23,11 @@ The platform utilizes Next.js 14, Shadcn UI components, Tailwind CSS, and Lucide
 
 ### 1. Subreddit Management
 
-#### View Available Subreddits
+#### 1.1 View Available Subreddits
 - Users can see a list of available subreddits displayed as cards
 - Common subreddits like "ollama" and "openai" are pre-added
 
-#### Add New Subreddits
+#### 1.2 Add New Subreddits
 - Users can click on an "Add Reddit" button to open a modal
 - In the modal, users can paste a Reddit URL to add a new subreddit
 - Upon adding, a new subreddit card is displayed on the home page
@@ -101,18 +101,48 @@ The project aims for minimal file usage while maintaining clarity and functional
 
 ```
 reddit-analytics
+├── README.md
 ├── app
-│   ├── layout.tsx
-│   ├── page.tsx
-│   └── r
-│       └── [subreddit]
-│           └── page.tsx
+│   ├── api
+│   │   └── reddit
+│   ├── favicon.ico
+│   ├── fonts
+│   │   ├── GeistMonoVF.woff
+│   │   └── GeistVF.woff
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── r
+│       └── [subreddit]
+├── components
+│   ├── AddSubredditModal.tsx
+│   ├── PostsTable.tsx
+│   ├── Providers.tsx
+│   ├── SubredditCard.tsx
+│   ├── ThemeAnalysis.tsx
+│   └── ui
+│       ├── badge.tsx
+│       ├── button.tsx
+│       ├── card.tsx
+│       ├── dialog.tsx
+│       ├── input.tsx
+│       ├── label.tsx
+│       ├── sheet.tsx
+│       ├── table.tsx
+│       └── tabs.tsx
+├── components.json
+├── instructions
+│   └── instructions.md
 ├── lib
-│   └── utils.ts
-├── styles
-│   └── globals.css
-├── next.config.js
+│   ├── cacheContext.tsx
+│   ├── postAnalyzer.ts
+│   └── utils.ts
+├── next-env.d.ts
+├── next.config.mjs
+├── package-lock.json
 ├── package.json
+├── postcss.config.mjs
+├── tailwind.config.ts
 └── tsconfig.json
 ```
 

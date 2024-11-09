@@ -7,8 +7,8 @@ import Link from "next/link";
 import { PostsTable } from "@/components/PostsTable";
 import { ThemeAnalysis } from "@/components/ThemeAnalysis";
 import { AnalyzedPost } from "@/lib/postAnalyzer";
-import { useCache } from "@/lib/cacheContext";
 import { Button } from "@/components/ui/button";
+import { PostWithAnalysis } from "@/lib/supabase/helpers";
 
 interface SubredditPageProps {
   params: {
@@ -16,46 +16,19 @@ interface SubredditPageProps {
   };
 }
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
 export default function SubredditPage({ params }: SubredditPageProps) {
-  const [analyzedPosts, setAnalyzedPosts] = useState<AnalyzedPost[]>([]);
+  const [posts, setPosts] = useState<PostWithAnalysis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("posts");
-  const { state, dispatch } = useCache();
 
   const fetchPosts = async (forceFetch = false) => {
-    const cachedData = state.posts[params.subreddit];
-    const now = Date.now();
-
-    // Use cache if available and not expired, unless force fetch is requested
-    if (
-      !forceFetch &&
-      cachedData &&
-      now - cachedData.timestamp < CACHE_DURATION
-    ) {
-      setAnalyzedPosts(cachedData.data);
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const response = await fetch(
-        `/api/reddit?subreddit=${params.subreddit}&analyze=true`
-      );
+      const response = await fetch(`/api/reddit?subreddit=${params.subreddit}`);
       if (!response.ok) throw new Error('Failed to fetch posts');
       const data = await response.json();
-      
-      // Update cache
-      dispatch({ 
-        type: 'SET_POSTS', 
-        subreddit: params.subreddit, 
-        posts: data 
-      });
-      
-      setAnalyzedPosts(data);
+      setPosts(data.posts || []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch posts');
@@ -65,19 +38,9 @@ export default function SubredditPage({ params }: SubredditPageProps) {
     }
   };
 
-  // Initial fetch
   useEffect(() => {
     setIsLoading(true);
     fetchPosts();
-    
-    // Clear old cache periodically
-    const interval = setInterval(() => {
-      dispatch({ type: 'CLEAR_OLD_CACHE' });
-    }, CACHE_DURATION);
-
-    return () => {
-      clearInterval(interval);
-    };
   }, [params.subreddit]);
 
   const handleRefetch = () => {
@@ -126,7 +89,7 @@ export default function SubredditPage({ params }: SubredditPageProps) {
               {error}
             </div>
           ) : (
-            <PostsTable posts={analyzedPosts} />
+            <PostsTable posts={posts} />
           )}
         </TabsContent>
 
@@ -139,11 +102,11 @@ export default function SubredditPage({ params }: SubredditPageProps) {
             <div className="rounded-lg border p-8 text-center text-red-500">
               {error}
             </div>
-          ) : analyzedPosts.length > 0 ? (
-            <ThemeAnalysis posts={analyzedPosts} />
+          ) : posts.length > 0 ? (
+            <ThemeAnalysis posts={posts} />
           ) : (
             <div className="rounded-lg border p-8 text-center text-muted-foreground">
-              No analyzed posts available.
+              No posts available.
             </div>
           )}
         </TabsContent>

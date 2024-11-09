@@ -10,12 +10,13 @@ import { RedditPost } from "@/lib/utils";
 import { AnalyzedPost, PostCategory } from "@/lib/postAnalyzer";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PostWithAnalysis, transformPosts } from '@/lib/supabase/helpers';
 
 interface PostsTableProps {
-  posts: (RedditPost | AnalyzedPost)[];
+  posts: PostWithAnalysis[];
 }
 
 type SortField = 'title' | 'score' | 'numComments' | 'createdAt';
@@ -29,8 +30,12 @@ interface SortState {
 const ITEMS_PER_PAGE = 15;
 
 // Helper function to check if a post is analyzed
-function isAnalyzedPost(post: RedditPost | AnalyzedPost): post is AnalyzedPost {
-  return 'categories' in post;
+function isAnalyzedPost(post: any): post is PostWithAnalysis & { categories: PostCategory } {
+  return 'categories' in post && 
+         'subreddit_id' in post &&
+         'num_comments' in post &&
+         'created_at' in post &&
+         'retrieved_at' in post;
 }
 
 // Helper function to get category display info
@@ -41,17 +46,26 @@ const CATEGORY_DISPLAY = {
   moneyTalk: { label: 'Money', className: 'bg-yellow-500' },
 } as const;
 
-export function PostsTable({ posts }: PostsTableProps) {
+export function PostsTable({ posts = [] }: PostsTableProps) {
   const [sort, setSort] = useState<SortState>({
     field: 'score',
     direction: 'desc'
   });
   const [currentPage, setCurrentPage] = useState(1);
 
-  const getSortedPosts = () => {
-    if (!sort.direction) return posts;
+  // Transform posts to the expected format
+  const transformedPosts = useMemo(() => {
+    return posts.map(post => ({
+      ...post,
+      createdAt: new Date(post.created_at) // Use created_at instead of createdAt
+    }));
+  }, [posts]);
 
-    return [...posts].sort((a, b) => {
+  const sortedPosts = useMemo(() => {
+    if (!transformedPosts.length) return [];
+    if (!sort.direction) return transformedPosts;
+
+    return [...transformedPosts].sort((a, b) => {
       const modifier = sort.direction === 'asc' ? 1 : -1;
       
       switch (sort.field) {
@@ -62,14 +76,12 @@ export function PostsTable({ posts }: PostsTableProps) {
         case 'numComments':
           return modifier * (a.numComments - b.numComments);
         case 'createdAt':
-          const dateA = new Date(a.createdAt);
-          const dateB = new Date(b.createdAt);
-          return modifier * (dateA.getTime() - dateB.getTime());
+          return modifier * (a.createdAt.getTime() - b.createdAt.getTime());
         default:
           return 0;
       }
     });
-  };
+  }, [transformedPosts, sort]);
 
   const toggleSort = (field: SortField) => {
     setSort(current => ({
@@ -94,10 +106,9 @@ export function PostsTable({ posts }: PostsTableProps) {
   };
 
   // Check if we're dealing with analyzed posts
-  const hasCategories = posts.length > 0 && isAnalyzedPost(posts[0]);
+  const hasCategories = transformedPosts.length > 0 && isAnalyzedPost(transformedPosts[0]);
 
   // Pagination logic
-  const sortedPosts = getSortedPosts();
   const totalPages = Math.ceil(sortedPosts.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedPosts = sortedPosts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -172,12 +183,14 @@ export function PostsTable({ posts }: PostsTableProps) {
               <TableCell className="text-right">{post.score}</TableCell>
               <TableCell className="text-right">{post.numComments}</TableCell>
               <TableCell className="text-right">
-                {formatDistanceToNow(post.createdAt, { addSuffix: true })}
+                {post.createdAt instanceof Date && !isNaN(post.createdAt.getTime())
+                  ? formatDistanceToNow(post.createdAt, { addSuffix: true })
+                  : 'Invalid date'}
               </TableCell>
               {hasCategories && (
                 <TableCell className="text-right">
                   <div className="flex gap-1 justify-end flex-wrap">
-                    {isAnalyzedPost(post) && Object.entries(post.categories)
+                    {Object.entries(post.categories)
                       .filter(([_, value]) => value)
                       .map(([category]) => (
                         <Badge 

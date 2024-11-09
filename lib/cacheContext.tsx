@@ -1,124 +1,88 @@
 "use client";
 
-import { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { AnalyzedPost } from './postAnalyzer';
 
-interface CacheState {
-  posts: {
-    [subreddit: string]: {
-      data: AnalyzedPost[];
-      timestamp: number;
-    };
+interface CacheData {
+  [subreddit: string]: {
+    posts: AnalyzedPost[];
+    lastUpdated: number;
   };
 }
 
-type CacheAction = 
-  | { type: 'SET_POSTS'; subreddit: string; posts: AnalyzedPost[] }
-  | { type: 'CLEAR_POSTS'; subreddit: string }
-  | { type: 'CLEAR_OLD_CACHE' }
-  | { type: 'HYDRATE'; state: CacheState };
-
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const STORAGE_KEY = 'reddit-analytics-cache';
-
-const CacheContext = createContext<{
-  state: CacheState;
-  dispatch: React.Dispatch<CacheAction>;
-} | null>(null);
-
-function cacheReducer(state: CacheState, action: CacheAction): CacheState {
-  let newState: CacheState;
-
-  switch (action.type) {
-    case 'SET_POSTS':
-      newState = {
-        ...state,
-        posts: {
-          ...state.posts,
-          [action.subreddit]: {
-            data: action.posts,
-            timestamp: Date.now(),
-          },
-        },
-      };
-      break;
-
-    case 'CLEAR_POSTS':
-      const { [action.subreddit]: _, ...remainingPosts } = state.posts;
-      newState = {
-        ...state,
-        posts: remainingPosts,
-      };
-      break;
-
-    case 'CLEAR_OLD_CACHE':
-      const now = Date.now();
-      const validPosts = Object.entries(state.posts).reduce(
-        (acc, [subreddit, cache]) => {
-          if (now - cache.timestamp < CACHE_DURATION) {
-            acc[subreddit] = cache;
-          }
-          return acc;
-        },
-        {} as CacheState['posts']
-      );
-      newState = {
-        ...state,
-        posts: validPosts,
-      };
-      break;
-
-    case 'HYDRATE':
-      newState = action.state;
-      break;
-
-    default:
-      return state;
-  }
-
-  // Persist to localStorage after every action
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-  }
-
-  return newState;
+interface CacheContextType {
+  cache: CacheData;
+  setCache: (subreddit: string, posts: AnalyzedPost[]) => void;
+  getCachedPosts: (subreddit: string) => AnalyzedPost[] | null;
 }
 
-function getInitialState(): CacheState {
-  if (typeof window !== 'undefined') {
-    const savedCache = localStorage.getItem(STORAGE_KEY);
-    if (savedCache) {
-      try {
-        const parsed = JSON.parse(savedCache);
-        // Convert ISO date strings back to Date objects
-        Object.values(parsed.posts).forEach((cache: any) => {
-          cache.data.forEach((post: any) => {
-            post.createdAt = new Date(post.createdAt);
-          });
-        });
-        return parsed;
-      } catch (error) {
-        console.error('Error parsing cache from localStorage:', error);
-      }
-    }
-  }
-  return { posts: {} };
-}
+const CacheContext = createContext<CacheContextType | undefined>(undefined);
 
-export function CacheProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(cacheReducer, null, getInitialState);
+export function CacheProvider({ children }: { children: React.ReactNode }) {
+  const [cache, setCache] = useState<CacheData>({});
 
-  // Clean old cache periodically
+  // Load cache from localStorage on mount
   useEffect(() => {
-    const interval = setInterval(() => {
-      dispatch({ type: 'CLEAR_OLD_CACHE' });
-    }, CACHE_DURATION);
-
-    return () => clearInterval(interval);
+    try {
+      const savedCache = localStorage.getItem('redditCache');
+      if (savedCache) {
+        const parsedCache = JSON.parse(savedCache);
+        // Validate cache structure
+        if (typeof parsedCache === 'object' && parsedCache !== null) {
+          // Convert date strings back to Date objects
+          Object.values(parsedCache).forEach((subredditData: any) => {
+            if (Array.isArray(subredditData.posts)) {
+              subredditData.posts = subredditData.posts.map((post: any) => ({
+                ...post,
+                createdAt: new Date(post.createdAt)
+              }));
+            }
+          });
+          setCache(parsedCache);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load cache from localStorage:', error);
+      localStorage.removeItem('redditCache'); // Clear invalid cache
+    }
   }, []);
 
+  // Save cache to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('redditCache', JSON.stringify(cache));
+    } catch (error) {
+      console.warn('Failed to save cache to localStorage:', error);
+    }
+  }, [cache]);
+
+  const setCacheForSubreddit = (subreddit: string, posts: AnalyzedPost[]) => {
+    setCache(prevCache => ({
+      ...prevCache,
+      [subreddit]: {
+        posts,
+        lastUpdated: Date.now()
+      }
+    }));
+  };
+
+  const getCachedPosts = (subreddit: string): AnalyzedPost[] | null => {
+    const cachedData = cache[subreddit];
+    if (!cachedData) return null;
+
+    // Check if cache is older than 24 hours
+    const isExpired = Date.now() - cachedData.lastUpdated > 24 * 60 * 60 * 1000;
+    return isExpired ? null : cachedData.posts;
+  };
+
   return (
-    <CacheContext.Provider value={{ state, dispatch }}>
+    <CacheContext.Provider
+      value={{
+        cache,
+        setCache: setCacheForSubreddit,
+        getCachedPosts
+      }}
+    >
       {children}
     </CacheContext.Provider>
   );
@@ -126,7 +90,7 @@ export function CacheProvider({ children }: { children: ReactNode }) {
 
 export function useCache() {
   const context = useContext(CacheContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useCache must be used within a CacheProvider');
   }
   return context;
